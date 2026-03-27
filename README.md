@@ -16,9 +16,9 @@ Aquests serveis es comuniquen entre ells mitjançant:
 - **Frontend** que consumeix l’API Gateway
 
 La infraestructura està organitzada en tres xarxes:
-- `frontend-net` → comunica frontend i API Gateway
-- `backend-net` → comunica microserveis, cache i message queue
-- `db-net` → comunica microserveis amb les bases de dades
+- `frontend-net` → comunica frontend i API Gateway 172.20.0.0/16
+- `backend-net` → comunica microserveis (product, order, user, notification), API Gateway, cache i message queue 172.19.0.0/16
+- `db-net` → comunica microserveis (product, orders, user) amb les bases de dades (db-orders, db-products) 172.18.0.0/16
 
 ---
 
