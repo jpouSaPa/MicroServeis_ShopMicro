@@ -1,4 +1,7 @@
 # ~/shopmicro/order-service/requirements.txt
 Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+PyMySQL==1.1.2
+cryptography==46.0.6
 pika==1.3.2
 gunicorn==22.0.0

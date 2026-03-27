@@ -1,53 +1,118 @@
 from flask import Flask, jsonify, request
-import pika, json, os
+from flask_sqlalchemy import SQLAlchemy
+import pika, json, os, time, datetime
 
 app = Flask(__name__)
 
-# Emmagatzematge en memòria (substitueix per una BD real si cal)
-orders_store = []
+# ─── Config MySQL ───────────────────────────────────────
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL',
+    'mysql+pymysql://root:rootpass@db-orders:3306/ordersdb'
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db = SQLAlchemy(app)
+
+
+# ─── Model ──────────────────────────────────────────────
+class Order(db.Model):
+    __tablename__ = 'orders'
+
+    id         = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    product_id = db.Column(db.Integer, nullable=True)
+    user_id    = db.Column(db.Integer, nullable=True)
+    quantity   = db.Column(db.Integer, nullable=True)
+    data       = db.Column(db.Text, nullable=False)        # JSON complet de la comanda
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    def to_dict(self):
+        base = json.loads(self.data)
+        base['id']         = self.id
+        base['created_at'] = self.created_at.isoformat()
+        return base
+
+
+# ─── Init BD (amb reintents per si MySQL triga a arrencar) ──
+def init_db():
+    retries = 10
+    for i in range(retries):
+        try:
+            with app.app_context():
+                db.create_all()
+            print('[ORDER] BD inicialitzada correctament', flush=True)
+            return
+        except Exception as e:
+            print(f'[ORDER] Esperant MySQL... ({i+1}/{retries}): {e}', flush=True)
+            time.sleep(3)
+    raise RuntimeError('No s\'ha pogut connectar a MySQL')
+
+
+# ─── RabbitMQ helper ────────────────────────────────────
+def publish_order(order_dict):
+    try:
+        conn = pika.BlockingConnection(pika.ConnectionParameters(
+            host=os.getenv('RABBITMQ_HOST', 'message-queue'),
+            credentials=pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpass')
+            )
+        ))
+        ch = conn.channel()
+        ch.queue_declare(queue='orders')
+        ch.basic_publish(exchange='', routing_key='orders', body=json.dumps(order_dict))
+        conn.close()
+    except Exception as e:
+        print(f'[ORDER] Error publicant a RabbitMQ: {e}', flush=True)
+
+
+# ─── Routes ─────────────────────────────────────────────
 @app.route('/orders', methods=['POST'])
 def create_order():
-    order = request.json
-    order['id'] = len(orders_store) + 1
+    payload = request.json
+    if not payload:
+        return jsonify({'error': 'No data provided'}), 400
 
-    # Guardar localment
-    orders_store.append(order)
+    order = Order(
+        product_id = payload.get('product_id'),
+        user_id    = payload.get('user_id'),
+        quantity   = payload.get('quantity'),
+        data       = json.dumps(payload)
+    )
+    db.session.add(order)
+    db.session.commit()
 
-    # Publicar missatge a RabbitMQ
-    conn = pika.BlockingConnection(pika.ConnectionParameters(
-        host=os.getenv('RABBITMQ_HOST', 'message-queue'),
-        credentials=pika.PlainCredentials(
-            os.getenv('RABBITMQ_USER', 'admin'),
-            os.getenv('RABBITMQ_PASS', 'adminpass')
-        )
-    ))
-    ch = conn.channel()
-    ch.queue_declare(queue='orders')
-    ch.basic_publish(exchange='', routing_key='orders', body=json.dumps(order))
-    conn.close()
-    return jsonify({'status': 'order_created', 'order': order}), 201
+    order_dict = order.to_dict()
+    publish_order(order_dict)
+
+    return jsonify({'status': 'order_created', 'order': order_dict}), 201
 
 
 @app.route('/orders', methods=['GET'])
 def get_orders():
-    """Retorna totes les comandes emmagatzemades."""
-    return jsonify({'orders': orders_store, 'total': len(orders_store)}), 200
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return jsonify({'orders': [o.to_dict() for o in orders], 'total': len(orders)}), 200
 
 
 @app.route('/orders/<int:order_id>', methods=['GET'])
 def get_order(order_id):
-    """Retorna una comanda per ID."""
-    order = next((o for o in orders_store if o.get('id') == order_id), None)
+    order = Order.query.get(order_id)
     if not order:
         return jsonify({'error': 'Comanda no trobada'}), 404
-    return jsonify(order), 200
+    return jsonify(order.to_dict()), 200
 
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'ok'})
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        db_status = 'ok'
+    except Exception:
+        db_status = 'error'
+    return jsonify({'status': 'ok', 'db': db_status}), 200
 
+
+# ─── Arrencada ──────────────────────────────────────────
+init_db()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

@@ -90,6 +90,7 @@ services:
     environment:
       RABBITMQ_HOST: message-queue
       DB_HOST: db-orders
+      DATABASE_URL: mysql+pymysql://root:rootpass@db-orders:3306/ordersdb
     networks: [backend-net, db-net]
     depends_on:
       db-orders: { condition: service_healthy }
