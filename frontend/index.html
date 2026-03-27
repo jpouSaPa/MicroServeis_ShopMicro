@@ -1,0 +1,23 @@
+<!DOCTYPE html><html>
+<head><title>ShopMicro</title></head>
+<body>
+  <h1>ShopMicro</h1>
+  <button onclick="loadProducts()">Carregar Productes</button>
+  <div id="products"></div>
+  <button onclick="loadOrders()">Carregar Comandes</button>
+  <div id="orders"></div>
+
+
+  <script>
+    async function loadProducts() {
+      const r = await fetch('/api/products/products');
+      const d = await r.json();
+      document.getElementById('products').innerHTML = JSON.stringify(d.data);
+    }
+    async function loadOrders () {
+      const r = await fetch('/api/products/products');
+      const d = await r.json();
+      document.getElementById('orders').innerHTML = JSON.stringify(d.data);
+    }
+  </script>
+</body></html>

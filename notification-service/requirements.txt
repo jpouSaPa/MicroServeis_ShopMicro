@@ -1,0 +1,5 @@
+# ~/shopmicro/product-service/requirements.txt
+flask==3.0.0
+redis==5.0.1
+pika==1.3.2
+mysqlclient==2.2.0

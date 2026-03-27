@@ -1,0 +1,128 @@
+# ~/shopmicro/docker-compose.yml
+version: '3.8'
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+  db-net:
+    driver: bridge
+
+volumes:
+  db_products_data:
+  db_orders_data:
+  rabbitmq_data:
+
+services:
+
+  # ─── BASES DE DADES ─────────────────────────────────
+  db-products:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: productsdb
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: adminpass
+    volumes:
+      - db_products_data:/var/lib/mysql
+    networks: [db-net]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-orders:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: ordersdb
+    volumes:
+      - db_orders_data:/var/lib/mysql
+    networks: [db-net]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── CACHE ──────────────────────────────────────────
+  cache:
+    image: redis:7-alpine
+    networks: [backend-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── CUA DE MISSATGES ───────────────────────────────
+  message-queue:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: adminpass
+    ports:
+      - "15672:15672"   # UI de gestió
+    networks: [backend-net]
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ─── MICROSERVEIS ────────────────────────────────────
+  product-service:
+    build: ./product-service
+    environment:
+      REDIS_HOST: cache
+      DB_HOST: db-products
+    networks: [backend-net, db-net]
+    depends_on:
+      db-products: { condition: service_healthy }
+      cache: { condition: service_healthy }
+
+  order-service:
+    build: ./order-service
+    environment:
+      RABBITMQ_HOST: message-queue
+      DB_HOST: db-orders
+    networks: [backend-net, db-net]
+    depends_on:
+      db-orders: { condition: service_healthy }
+      message-queue: { condition: service_healthy }
+
+  user-service:
+    build: ./user-service
+    environment:
+      DB_HOST: db-orders
+    networks: [backend-net, db-net]
+    depends_on:
+      db-orders: { condition: service_healthy }
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      RABBITMQ_HOST: message-queue
+    networks: [backend-net]
+    depends_on:
+      message-queue: { condition: service_healthy }
+
+  # ─── API GATEWAY ─────────────────────────────────────
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:80"
+    networks: [frontend-net, backend-net]
+    depends_on: [product-service, order-service, user-service]
+
+  # ─── FRONTEND ─────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    networks: [frontend-net]
+    depends_on: [api-gateway]
