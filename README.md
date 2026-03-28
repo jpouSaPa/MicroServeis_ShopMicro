@@ -1,3 +1,4 @@
+Consulta la documentació aquí: [Fitxer 1](doc/fitxer1.md)
 
 # 🧩 **Visió general del projecte**
 
@@ -42,7 +43,8 @@ La infraestructura està organitzada en tres xarxes:
 
 # ⚡ **Cache**
 
-## **cache (Redis)**
+## **cache ([Redis](doc/redis.md))**
+
 - Imatge: `redis:7-alpine`
 - Usat per `product-service` per accelerar consultes de productes
 - Xarxa: `backend-net`
@@ -51,7 +53,7 @@ La infraestructura està organitzada en tres xarxes:
 
 # 📬 **Cua de missatges**
 
-## **message-queue (RabbitMQ)**
+## **message-queue ([RabbitMQ](doc/rabbit.md))**
 - Imatge: `rabbitmq:3-management-alpine`
 - Porta exposada: `15672` (panell de gestió)
 - Usat per:
@@ -62,7 +64,7 @@ La infraestructura està organitzada en tres xarxes:
 
 # 🧩 **Microserveis**
 
-## **1. product-service**
+## **1. [product-service](doc/product.md)**
 - Directori: `./product-service`
 - Dependències:
   - Redis (`cache`)
@@ -75,7 +77,7 @@ La infraestructura està organitzada en tres xarxes:
 
 ---
 
-## **2. order-service**
+## **2. [order-service](doc/order.md)**
 - Directori: `./order-service`
 - Dependències:
   - MySQL (`db-orders`)
@@ -89,7 +91,7 @@ La infraestructura està organitzada en tres xarxes:
 
 ---
 
-## **3. user-service**
+## **3. [user-service](doc/user.md)**
 - Directori: `./user-service`
 - Dependència:
   - MySQL (`db-orders`) — possiblement comparteix taules o BD
@@ -100,7 +102,7 @@ La infraestructura està organitzada en tres xarxes:
 
 ---
 
-## **4. notification-service**
+## **4. [notification-service](doc/notification.md)**
 - Directori: `./notification-service`
 - Dependència:
   - RabbitMQ (`message-queue`)
@@ -114,7 +116,7 @@ La infraestructura està organitzada en tres xarxes:
 
 # 🌐 **API Gateway**
 
-## **api-gateway**
+## **[api-gateway](doc/gateway.md)**
 - Directori: `./api-gateway`
 - Exposa: `8080:80`
 - Funció:
@@ -178,3 +180,57 @@ Tots els serveis estan **UP** i funcionant, incloent:
 - Frontend exposat a `localhost:80`
 
 Això indica que el sistema complet està operatiu.
+
+
+# 🧩 **Vista General de l'Arquitectura**
+
+                          ┌──────────────────────┐
+                          │      Frontend        │
+                          │   (React / Nginx)    │
+                          └──────────┬───────────┘
+                                     │ HTTP
+                                     ▼
+                      ┌───────────────────────────────────┐
+                      │        API Gateway (Nginx)        │
+                      │  - /api/products  → product-srv   │
+                      │  - /api/orders    → order-srv     │
+                      │  - /api/users     → user-srv      │
+                      └──────────┬──────────┬────────────┘
+                                 │          │
+                     ┌───────────┘          └───────────────┐
+                     ▼                                       ▼
+           ┌──────────────────┐                    ┌──────────────────┐
+           │ product-service  │                    │  user-service    │
+           │ Flask + Redis    │                    │ Flask + JWT + DB │
+           └───────┬──────────┘                    └──────────┬───────┘
+                   │    Cache Aside (+TTL)                   │
+                   │                                          │
+         ┌─────────▼──────────┐                   ┌───────────▼────────┐
+         │       Redis        │                   │    SQLite / MySQL   │
+         │ (Cache de product) │                   │ (Base de dades usus)│
+         └────────────────────┘                   └──────────────────────┘
+
+
+                                   ┌──────────────────────────┐
+                                   │      order-service        │
+                                   │ Flask + MySQL + RabbitMQ │
+                                   └──────────┬───────────────┘
+                                              │
+                          Guarda comandes     │   Publica events
+                                              ▼
+                              ┌──────────────────────────┐
+                              │      MySQL ordersdb      │
+                              └──────────────────────────┘
+                                              │
+                                              ▼
+                                  ┌────────────────────┐
+                                  │    RabbitMQ MQ     │
+                                  │   queue = orders   │
+                                  └──────────┬─────────┘
+                                             │
+                                             ▼
+                                  ┌────────────────────┐
+                                  │ notification-srv   │
+                                  │   Consumer MQ      │
+                                  └────────────────────┘
+
