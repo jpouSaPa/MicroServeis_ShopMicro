@@ -1,11 +1,18 @@
 FROM python:3.12-slim
 
+# --- Install system dependencies required for cryptography ---
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Security: no root in production
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 WORKDIR /app
 
-# Dependencies first (layer cache)
+# Dependencies first (better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -18,9 +25,4 @@ USER appuser
 
 EXPOSE 5002
 
-ENV FLASK_DEBUG=false \
-    SECRET_KEY=change-me-in-production \
-    DATABASE_URL=sqlite:///users.db \
-    JWT_EXPIRATION_HOURS=24
-
-CMD ["gunicorn", "--bind", "0.0.0.0:5002", "--workers", "2", "--timeout", "60", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5002", "app:app"]

@@ -1,6 +1,7 @@
-# ~/shopmicro/user-service/requirements.txt
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
+PyMySQL==1.1.2
+cryptography==46.0.6
 PyJWT==2.8.0
 Werkzeug==3.0.3
 gunicorn==22.0.0

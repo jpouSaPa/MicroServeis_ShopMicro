@@ -4,35 +4,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
 import os
-import time
 from functools import wraps
 
 app = Flask(__name__)
 
-# ───────────────────────────────────────────────
-# CONFIGURACIÓ
-# ───────────────────────────────────────────────
-
+# Config
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-prod')
-
-# Connexió MySQL (per defecte db-users)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL',
-    'mysql+pymysql://root:rootpass@db-users:3306/usersdb'
-)
-
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_EXPIRATION_HOURS'] = int(os.environ.get('JWT_EXPIRATION_HOURS', 24))
 
 db = SQLAlchemy(app)
 
-# ───────────────────────────────────────────────
-# MODEL USER
-# ───────────────────────────────────────────────
+
+# --- Model ---
 
 class User(db.Model):
-    __tablename__ = 'users'
-
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -49,9 +36,8 @@ class User(db.Model):
             'is_active': self.is_active
         }
 
-# ───────────────────────────────────────────────
-# JWT HELPERS
-# ───────────────────────────────────────────────
+
+# --- JWT helpers ---
 
 def generate_token(user_id):
     payload = {
@@ -67,60 +53,28 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
         auth_header = request.headers.get('Authorization')
-
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
-
         if not token:
             return jsonify({'error': 'Token missing'}), 401
-
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             current_user = User.query.get(data['sub'])
-
             if not current_user or not current_user.is_active:
                 return jsonify({'error': 'User not found or inactive'}), 401
-
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
-
         return f(current_user, *args, **kwargs)
     return decorated
 
 
-# ───────────────────────────────────────────────
-# DB INIT — AMB REINTENTS (com order-service)
-# ───────────────────────────────────────────────
-
-def init_db():
-    retries = 10
-    for i in range(retries):
-        try:
-            with app.app_context():
-                db.create_all()
-            print('[USER] BD inicialitzada correctament', flush=True)
-            return
-        except Exception as e:
-            print(f'[USER] Esperant MySQL... ({i+1}/{retries}): {e}', flush=True)
-            time.sleep(3)
-    raise RuntimeError("No s'ha pogut connectar a MySQL")
-
-init_db()
-
-
-# ───────────────────────────────────────────────
-# ENDPOINTS
-# ───────────────────────────────────────────────
+# --- Routes ---
 
 @app.route('/health', methods=['GET'])
 def health():
-    try:
-        db.session.execute(db.text('SELECT 1'))
-        return jsonify({'status': 'ok', 'service': 'user-service', 'db': 'ok'}), 200
-    except:
-        return jsonify({'status': 'ok', 'service': 'user-service', 'db': 'error'}), 500
+    return jsonify({'status': 'ok', 'service': 'user-service'}), 200
 
 
 @app.route('/register', methods=['POST'])
@@ -167,7 +121,6 @@ def login():
         return jsonify({'error': 'email and password are required'}), 400
 
     user = User.query.filter_by(email=email).first()
-
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({'error': 'Invalid credentials'}), 401
     if not user.is_active:
@@ -213,30 +166,18 @@ def delete_me(current_user):
     db.session.commit()
     return jsonify({'message': 'Account deactivated'}), 200
 
-@app.route('/admin/enable', methods=['POST'])
-def admin_enable_user():
-    data = request.get_json()
-    if not data or 'email' not in data:
-        return jsonify({'error': 'email is required'}), 400
 
-    email = data['email'].strip().lower()
+# --- Init ---
 
-    user = User.query.filter_by(email=email).first()
+_db_initialized = False
 
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
+@app.before_request
+def init_db():
+    global _db_initialized
+    if not _db_initialized:
+        db.create_all()
+        _db_initialized = True
 
-    user.is_active = True
-    db.session.commit()
-
-    return jsonify({
-        'status': 'user_enabled',
-        'user': user.to_dict()
-    }), 200
-
-# ───────────────────────────────────────────────
-# ARRANCADA
-# ───────────────────────────────────────────────
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002)
+    app.run(host='0.0.0.0', port=5002, debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')

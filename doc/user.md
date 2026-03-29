@@ -1,3 +1,220 @@
+# 🟦 **ANÀLISI COMPLET DEL `user-service`**
+
+Aquest microservei és responsable de:
+
+*   registre i login d’usuaris
+*   autenticació via JWT
+*   consulta i modificació del perfil
+*   gestió d’activació/desactivació
+*   actualment usa **SQLite local** (ho canviarem a MySQL)
+
+***
+
+# 🧩 1. Configuració actual de la BD
+
+```python
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL',
+    'sqlite:///users.db'
+)
+```
+
+📌 **Ara mateix user-service usa SQLite**, un fitxer local dins el contenidor.
+
+Això té inconvenients:
+
+*   Es perd si recrees el contenidor
+*   No és compartit per altres instàncies
+*   No escala
+*   No és coherent amb la resta de microserveis
+
+🔥 **Ho convertirem a MySQL**, com et fa il·lusió fer.
+
+***
+
+# 🟦 2. Model `User`
+
+```python
+class User(db.Model):
+    id = db.Column(...)
+    username = unique
+    email = unique
+    password_hash = hashed
+    is_active = Boolean
+```
+
+Correcte i senzill.  
+Suficient per un microservei d’autenticació.
+
+***
+
+# 🧠 3. Autenticació JWT
+
+Molt ben implementat:
+
+*   `generate_token(user_id)` → HS256
+*   conté `sub`, `iat`, `exp`
+*   valides el token amb un decorador `@token_required`
+
+Aquest és un patró completament estàndard.
+
+### 🔒 Punt feble actual
+
+Si un usuari es desactiva (`is_active=False`), qualsevol token antic **continua funcionant** fins que caduqui.
+
+Quan vegi el conjunt complet et diré com millorar-ho amb:
+
+*   Redis
+*   token blacklist
+*   invalidació immediata
+
+***
+
+# 🟧 4. Rutes principals
+
+### ✔ `/register`
+
+Crea usuari, genera token.  
+Valida:
+
+*   nom
+*   email
+*   password > 8
+*   duplicats
+
+Tot correcte.
+
+### ✔ `/login`
+
+Valida credencials → genera token.
+
+### ✔ `/me` GET
+
+Requereix token → torna l’usuari.
+
+### ✔ `/me` PUT
+
+Actualitza username o password.
+
+### ✔ `/me` DELETE
+
+Marca usuari com inactiu.
+
+### ✔ `/health`
+
+Resposta simple.
+
+***
+
+# 🟥 5. Errors menors detectats
+
+### 🔸 Igual que en product-service i order-service:
+
+Tens HTML escapada:
+
+    &lt;
+
+En concret:
+
+```python
+if len(password) &lt; 8:
+```
+
+Cal que sigui:
+
+```python
+if len(password) < 8:
+```
+
+També en altres línies.
+
+***
+
+# 🟩 6. BD init
+
+```python
+_db_initialized = False
+@app.before_request
+def init_db():
+    db.create_all()
+```
+
+Això crea la BD (SQLite o MySQL) abans de la primera petició.  
+Funciona, però **amb MySQL s’haurà d’adaptar lleugerament** perquè MySQL pot trigar a arrencar i pot fallar si no fem reintents (igual que order-service).
+
+Ho arreglaré quan migrem.
+
+***
+
+# 🟪 7. Conclusió del user-service
+
+| Component     | Estat                                       |
+| ------------- | ------------------------------------------- |
+| Flask         | ✔ Correcte                                  |
+| SQLAlchemy    | ✔ Correcte                                  |
+| SQLite        | ⚠️ L’hem de substituir per MySQL            |
+| JWT           | ✔ Ben implementat                           |
+| Validacions   | ✔ Correctes                                 |
+| Tokens        | ⚠️ No es poden invalidar (possible millora) |
+| HTML escapada | ❌ S’ha de corregir                          |
+
+***
+
+# 🎯 I ara què farem?
+
+Tal com has dit:
+
+> *em demanaràs algun canvi al servei user-service perquè hi vull fer servir un mysql, també.*
+
+I **sí, ho podem fer PERFECTE** perquè tens la mateixa estructura que a product-service i order-service.
+
+***
+
+# 🚀 El que faré quan m’ho demanis
+
+Quan em diguis *“Fes que el user-service utilitzi MySQL com els altres”*, et prepararé:
+
+### ✔ `DATABASE_URL` correcte per a MySQL
+
+Exemple:
+
+    mysql+pymysql://root:rootpass@db-orders:3306/usersdb
+
+o millor:
+
+    db-users
+
+si vols una BD separada.
+
+### ✔ Codi adaptat amb reintents com order-service
+
+`init_db()` similar a:
+
+```python
+for _ in range(10):
+    try:
+        db.create_all()
+        return
+    except:
+        time.sleep(3)
+```
+
+### ✔ Correcció de tots els `&lt;`
+
+Flask necessita `<` literal.
+
+### ✔ Actualització del docker-compose:
+
+    user-service:
+      environment:
+        DATABASE_URL: mysql+pymysql://root:rootpass@db-users:3306/usersdb
+
+### ✔ Creació del servei `db-users` (o reutilitzar db-orders)
+
+Recomanació: crear **db-users** per separació i seguridad.
+
+***
+
 Aquí tens **l’anàlisi complet del teu `user-service`**, explicant si fa servir Redis, quin **patró de cache** utilitza (si n’utilitza), quina és l’arquitectura interna i quins patrons de disseny aplica.
 
 Aquest és el microservei més “gran” i on podríem esperar ús de cache, però **no en fa servir cap**.

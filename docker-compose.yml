@@ -12,6 +12,7 @@ networks:
 volumes:
   db_products_data:
   db_orders_data:
+  db_users_data:
   rabbitmq_data:
 
 services:
@@ -40,6 +41,20 @@ services:
       MYSQL_DATABASE: ordersdb
     volumes:
       - db_orders_data:/var/lib/mysql
+    networks: [db-net]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db-users:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: usersdb
+    volumes:
+      - db_users_data:/var/lib/mysql
     networks: [db-net]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -99,10 +114,13 @@ services:
   user-service:
     build: ./user-service
     environment:
-      DB_HOST: db-orders
+      DB_HOST: db-users
+      DATABASE_URL: mysql+pymysql://root:rootpass@db-users:3306/usersdb
+      SECRET_KEY: "x7FjQ9m2R4pS8uV3w0LbA1fT9ZkH5cN2yPqR6sM8nE0bV4tG7hJ1kL9dF6X3C2Z"
     networks: [backend-net, db-net]
     depends_on:
-      db-orders: { condition: service_healthy }
+      db-users: { condition: service_healthy }
+      message-queue: { condition: service_healthy }
 
   notification-service:
     build: ./notification-service

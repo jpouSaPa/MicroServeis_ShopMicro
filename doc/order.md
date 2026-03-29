@@ -1,3 +1,141 @@
+# 🟧 **ANÀLISI COMPLET DEL `order-service`**
+
+*(Tot correcte, funcional, i ben integrat amb RabbitMQ i MySQL)*
+
+Aquest microservei és la **peça central** del teu ShopMicro, perquè gestiona les comandes i emet events.
+
+***
+
+# 🧩 1. **Flask com a API HTTP**
+
+```python
+app = Flask(__name__)
+```
+
+*   Servei web lleuger
+*   APIs REST
+*   Exposició de `/orders`, `/health`, etc.
+
+Correctíssim.
+
+***
+
+# 🟦 2. **SQLAlchemy (ORM) + MySQL 8**
+
+```python
+app.config['SQLALCHEMY_DATABASE_URI'] =
+    'mysql+pymysql://root:rootpass@db-orders:3306/ordersdb'
+```
+
+✔ Usa MySQL real  
+✔ Usa PyMySQL (correcte per Docker)  
+✔ Taula `orders` amb camps ben definits  
+✔ `db.create_all()` automàtic a l’inici
+
+**IMPORTANT:**  
+Has posat un sistema de reintents de connexió:
+
+```python
+retries = 10
+time.sleep(3)
+```
+
+Això és EXCEL·LENT per MySQL 8, perquè sempre triga a arrencar.
+
+***
+
+# 🐇 3. **Integració amb RabbitMQ usando Pika**
+
+Aquesta funció és la clau:
+
+```python
+def publish_order(order_dict):
+    conn = pika.BlockingConnection(...)
+    ch = conn.channel()
+    ch.queue_declare(queue='orders')
+    ch.basic_publish(exchange='', routing_key='orders', body=...)
+```
+
+L’ordre de creació és:
+
+1.  Crear comanda
+2.  Guardar-la a MySQL
+3.  Enviar event a RabbitMQ
+
+El servei `notification-service` rep aquest event.
+
+Això implementa un **patró d’event publishing** molt ben resolt.
+
+***
+
+# 🟨 4. **Endpoints**
+
+## ✔ POST `/orders` — Crear comanda
+
+*   Llegeix JSON
+*   Guarda comanda
+*   Publica event
+*   Retorna JSON amb la comanda creada
+
+Correcte i complet.
+
+## ✔ GET `/orders` — Llistar totes les comandes
+
+*   `Order.query.order_by(...)`
+*   Retorna llista + total
+*   Cap cache (és OK)
+
+## ✔ GET `/orders/<id>`
+
+Hi ha una errada **de HTML escapada**:
+
+Al codi tens:
+
+```python
+@app.route('/orders/&lt;int:order_id&gt;', methods=['GET'])
+```
+
+Ha de ser:
+
+```python
+@app.route('/orders/<int:order_id>', methods=['GET'])
+```
+
+Quan me’l demanis, te’l corregeixo.
+
+## ✔ GET `/health`
+
+Comprova la BD.
+
+***
+
+# 🟩 5. **Inicialització de BD**
+
+```python
+init_db()
+```
+
+Es fa ANTES d’arrencar Flask.  
+És correcte.
+
+***
+
+# 🟦 6. **Conclusions generals**
+
+| Component          | Estat                          |
+| ------------------ | ------------------------------ |
+| Flask              | 👍 Perfecte                    |
+| SQLAlchemy + MySQL | 👍 Correcte i robust           |
+| Pika + RabbitMQ    | 👍 Funcionant                  |
+| Endpoints          | 👍 Complets                    |
+| Error HTML         | ⚠️ Petita correcció necessària |
+| Es pot millorar?   | Sí, Logger + validacions       |
+
+Tot el disseny és coherent i professional.
+
+***
+
+
 Perfecte, Joan! Aquí tens **l’anàlisi complet del microservei `order-service`**, explicant sobretot:
 
 ✅ si utilitza Redis  

@@ -1,3 +1,151 @@
+Aquí tens l’anàlisi detallat del **notification-service**:
+
+***
+
+# 🟪 **Anàlisi complet del microservei `notification-service`**
+
+Aquest microservei fa exactament una cosa: **escoltar la cua `orders` de RabbitMQ** i processar cada missatge rebent-lo en temps real.
+
+***
+
+# 🧩 **1. Importacions**
+
+```python
+import pika, json, os, time
+```
+
+*   `pika` → el client Python per RabbitMQ
+*   `json` → per parsejar el missatge JSON
+*   `os` → agafar variables d’entorn
+*   `time` → per fer `sleep()` inicial
+
+Correcte i suficient.
+
+***
+
+# 📥 **2. Callback: què passa quan arriba un missatge**
+
+```python
+def callback(ch, method, properties, body):
+    order = json.loads(body)
+    print(f'[NOTIF] Nova comanda rebuda: {order}', flush=True)
+```
+
+`callback()` es cridarà automàticament cada vegada que RabbitMQ envia un missatge de la queue **orders**.
+
+*   `body` → conté el JSON que ha enviat `order-service`
+*   `json.loads(body)` → converteix el text a diccionari Python
+*   `print(flush=True)` → s’assegura que es vegi als logs immediatament
+
+Aquest servei **no guarda a BD**, **no usa Redis**, **no fa res més**. És un treballador simple.
+
+***
+
+# 🔌 **3. Connexió a RabbitMQ**
+
+```python
+conn = pika.BlockingConnection(
+    pika.ConnectionParameters(
+        host=os.getenv('RABBITMQ_HOST', 'message-queue'),
+        credentials=pika.PlainCredentials(
+            os.getenv('RABBITMQ_USER', 'admin'),
+            os.getenv('RABBITMQ_PASS', 'adminpass')
+        )
+    )
+)
+```
+
+*   `BlockingConnection` → la manera més simple de mantenir una connexió AMQP
+*   `RABBITMQ_HOST` → ve del docker-compose (message-queue)
+*   credentials: correcte per accedir al Rabbit amb usuari/password
+
+🟢 Funcionarà perfectament amb RabbitMQ 3-management-alpine, tal com tens configurat.
+
+***
+
+# 📥 **4. Declaració de la queue**
+
+```python
+ch.queue_declare(queue='orders')
+```
+
+Si la cua **no existeix**, la crea.  
+Si existeix, la reutilitza.
+
+Important perquè evita errors si s’inicia el consumer abans que el publisher (order-service).
+
+***
+
+# 📨 **5. Consum de missatges**
+
+```python
+ch.basic_consume(
+    queue='orders',
+    on_message_callback=callback,
+    auto_ack=True
+)
+```
+
+Aquest és el cor del microservei.
+
+*   `on_message_callback=callback` → crida la funció que hem vist abans
+*   `auto_ack=True` → atenció:
+
+### 🔴 IMPORTANT: amb `auto_ack=True` els missatges es donen per consumits encara que el teu codi falli.
+
+Si un dia vols robustesa, et puc fer una versió amb:
+
+```python
+auto_ack=False
+ch.basic_ack()
+```
+
+i un sistema de retrys.
+
+***
+
+# 🔁 **6. Bucle infinit: escoltar events per sempre**
+
+```python
+ch.start_consuming()
+```
+
+Això queda bloquejat fins que:
+
+*   arriba un missatge (executa callback)
+*   i després continua escoltant
+
+***
+
+# 🟦 **7. Workflow complet dins del teu ecosistema**
+
+Aquest microservei funciona així:
+
+    order-service (guarda comanda a MySQL)
+        ↓
+    order-service → envia JSON a RabbitMQ (queue 'orders')
+        ↓
+    RabbitMQ manté el missatge fins que un consumer el llegeix
+        ↓
+    notification-service rep el missatge
+        ↓
+    callback() → print() o el que li vulguis fer fer
+
+És **desacoblat, asíncron i escalable**.
+
+***
+
+# 🟢 **8. Veredicte del microservei**
+
+És correcte, simple i funcional.  
+Fa exactament el que ha de fer: consumir missatges sense fer res més.
+
+No té dependències extra, no necessita Redis ni MySQL, i no emmagatzema res.
+
+***
+
+
+
 # 📨 **Anàlisi del microservei `notification-service`**
 
 Perfecte, Joan.  

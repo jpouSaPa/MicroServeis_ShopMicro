@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Productes · ShopMicro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family:'DM Sans', sans-serif;
+    background:#f5f2ee;
+    color:#1a1612;
+}
+
+/* TOPBAR */
+.topbar {
+    height:56px; background:#fff; border-bottom:1px solid #ddd;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 2rem;
+    box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    position:sticky; top:0; z-index:50;
+}
+.brand { display:flex; align-items:center; gap:0.6rem; }
+.brand-mark {
+    width:28px; height:28px; border-radius:6px;
+    background:#c84b2f; color:#fff; display:flex;
+    align-items:center; justify-content:center;
+    font-family:'DM Mono'; font-size:.7rem; font-weight:500;
+}
+.brand-name { font-family:'DM Mono'; font-size:0.8rem; }
+.brand-name span { color:#8a7f74; }
+
+.nav {
+    display:flex; align-items:center; gap:1rem;
+}
+.nav a {
+    font-family:'DM Mono'; font-size:.75rem;
+    text-decoration:none; color:#5a524a;
+    padding:0.4rem 0.7rem; border-radius:6px;
+}
+.nav a.active {
+    background:#c84b2f; color:#fff;
+}
+.nav a:hover {
+    background:#e5dcd4;
+}
+
+/* PAGE */
+.page {
+    padding:2rem; max-width:1100px; margin:auto;
+}
+
+/* SECTIONS */
+.section {
+    background:#fff; border:1px solid #ddd;
+    border-radius:10px; padding:1.5rem;
+    margin-bottom:2rem;
+    box-shadow:0 2px 6px rgba(0,0,0,0.04);
+}
+.section h2 {
+    margin-bottom:1rem; font-family:'DM Mono';
+    font-size:1rem; color:#5a524a;
+}
+
+/* TABLE */
+table { width:100%; border-collapse:collapse; margin-top:1rem; }
+th, td {
+    border:1px solid #ddd; padding:10px;
+    font-size:0.9rem;
+}
+th {
+    background:#f2efeb; font-family:'DM Mono'; font-size:0.75rem;
+}
+tr:hover { background:#f9f5f1; }
+
+/* FORMS */
+input {
+    padding:0.5rem 0.7rem; border:1px solid #ccc;
+    border-radius:6px; margin:0.3rem 0;
+    width:220px; font-size:0.9rem;
+    font-family:'DM Sans';
+}
+button {
+    padding:0.55rem 1rem; border:none; border-radius:6px;
+    cursor:pointer; font-family:'DM Sans';
+    background:#c84b2f; color:white;
+}
+button:hover {
+    background:#a63c25;
+}
+pre {
+    background:#f2efeb; padding:1rem; border-radius:8px;
+    margin-top:1rem; white-space:pre-wrap;
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOPBAR + MENÚ -->
+<div class="topbar">
+    <div class="brand">
+        <div class="brand-mark">SM</div>
+        <div class="brand-name">ShopMicro <span>Productes</span></div>
+    </div>
+    <div class="nav">
+        <a href="products-dashboard.html" class="active">Productes</a>
+        <a href="users-dashboard.html">Usuaris</a>
+        <a href="orders-dashboard.html">Comandes</a>
+    </div>
+</div>
+
+<div class="page">
+
+<!-- HEALTH -->
+<div class="section">
+<h2>Health</h2>
+<button onclick="checkHealth()">Comprovar</button>
+<pre id="health"></pre>
+</div>
+
+<!-- LLISTAR -->
+<div class="section">
+<h2>Llista de productes</h2>
+<button onclick="loadProducts()">Carregar productes</button>
+<input id="search" placeholder="Cercar..." oninput="filterTable()">
+<table id="table"></table>
+</div>
+
+<!-- GET -->
+<div class="section">
+<h2>Obtenir producte per ID</h2>
+<input id="getId" type="number" placeholder="ID">
+<button onclick="getProduct()">Consultar</button>
+<pre id="getOut"></pre>
+</div>
+
+<!-- CREAR -->
+<div class="section">
+<h2>Crear producte</h2>
+<input id="newName" placeholder="Nom">
+<input id="newPrice" type="number" step="0.01" placeholder="Preu">
+<button onclick="createProduct()">Crear</button>
+<pre id="createOut"></pre>
+</div>
+
+<!-- ACTUALITZAR -->
+<div class="section">
+<h2>Actualitzar producte</h2>
+<input id="updId" type="number" placeholder="ID">
+<input id="updName" placeholder="Nou nom">
+<input id="updPrice" type="number" step="0.01" placeholder="Nou preu">
+<button onclick="updateProduct()">Actualitzar</button>
+<pre id="updateOut"></pre>
+</div>
+
+<!-- ESBORRAR -->
+<div class="section">
+<h2>Esborrar producte</h2>
+<input id="delId" type="number" placeholder="ID">
+<button onclick="deleteProduct()">Esborrar</button>
+<pre id="deleteOut"></pre>
+</div>
+
+</div>
+
+<script>
+// ⛔ IMPORTANT!
+// Autodetectem IP i port del servidor:
+const BASE = window.location.origin;
+// Product-service a través del gateway:
+const API = BASE + "/api/products/products";
+
+let lastProducts = [];
+
+// HEALTH
+function checkHealth() {
+    fetch(BASE + "/api/products/health")
+        .then(r => r.json())
+        .then(d => document.getElementById("health").textContent = JSON.stringify(d, null, 2))
+        .catch(e => document.getElementById("health").textContent = e);
+}
+
+// LISTAR
+function loadProducts() {
+    fetch(API)
+        .then(r => r.json())
+        .then(d => {
+            lastProducts = d.data || [];
+            renderTable(lastProducts);
+        });
+}
+
+function renderTable(list) {
+    const tbl = document.getElementById("table");
+    if (list.length === 0) {
+        tbl.innerHTML = "<tr><td>No hi ha productes</td></tr>";
+        return;
+    }
+    let html = "<tr><th>ID</th><th>Nom</th><th>Preu</th><th>Creat</th></tr>";
+    list.forEach(p => {
+        html += "<tr>" +
+                "<td>"+p.id+"</td>" +
+                "<td>"+p.name+"</td>" +
+                "<td>"+p.price+"</td>" +
+                "<td>"+p.created_at+"</td>" +
+                "</tr>";
+    });
+    tbl.innerHTML = html;
+}
+
+function filterTable() {
+    const s = document.getElementById("search").value.toLowerCase();
+    const res = lastProducts.filter(p => JSON.stringify(p).toLowerCase().includes(s));
+    renderTable(res);
+}
+
+// GET
+function getProduct() {
+    const id = document.getElementById("getId").value;
+    fetch(API + "/" + id)
+        .then(r => r.json())
+        .then(d => document.getElementById("getOut").textContent = JSON.stringify(d, null, 2));
+}
+
+// CREAR
+function createProduct() {
+    const name = document.getElementById("newName").value;
+    const price = parseFloat(document.getElementById("newPrice").value);
+
+    fetch(API, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({name, price})
+    })
+    .then(r => r.json())
+    .then(d => document.getElementById("createOut").textContent = JSON.stringify(d, null, 2));
+}
+
+// ACTUALITZAR
+function updateProduct() {
+    const id = document.getElementById("updId").value;
+    const name = document.getElementById("updName").value;
+    const price = parseFloat(document.getElementById("updPrice").value);
+
+    fetch(API + "/" + id, {
+        method:"PUT",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({name, price})
+    })
+    .then(r => r.json())
+    .then(d => document.getElementById("updateOut").textContent = JSON.stringify(d, null, 2));
+}
+
+// ESBORRAR
+function deleteProduct() {
+    const id = document.getElementById("delId").value;
+    fetch(API + "/" + id, { method:"DELETE" })
+        .then(r => r.json())
+        .then(d => document.getElementById("deleteOut").textContent = JSON.stringify(d, null, 2));
+}
+
+</script>
+
+</body>
+</html>

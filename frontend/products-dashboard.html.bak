@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>Product Service Frontend</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        h2 { margin-top: 40px; }
+        input, button { padding: 6px; margin: 5px; }
+        table { border-collapse: collapse; margin-top: 20px; width: 80%; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        th { background: #eee; }
+        .section { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; }
+    </style>
+</head>
+
+<body>
+
+<h1>Product-Service Frontend</h1>
+<p>Via API Gateway → <strong>http://localhost:8080/api/products/...</strong></p>
+
+<!-- LISTA -->
+<div class="section">
+    <h2>Llistar tots els productes</h2>
+    <button onclick="loadProducts()">Carregar productes</button>
+    <div id="productList"></div>
+</div>
+
+<!-- GET PER ID -->
+<div class="section">
+    <h2>Obtenir producte per ID</h2>
+    <input type="number" id="getId" placeholder="ID">
+    <button onclick="getProduct()">Consultar</button>
+    <div id="getResult"></div>
+</div>
+
+<!-- CREAR -->
+<div class="section">
+    <h2>Crear producte</h2>
+    <input id="newName" placeholder="Nom">
+    <input id="newPrice" type="number" placeholder="Preu" step="0.01">
+    <button onclick="createProduct()">Crear</button>
+    <div id="createResult"></div>
+</div>
+
+<!-- ACTUALITZAR -->
+<div class="section">
+    <h2>Actualitzar producte</h2>
+    <input id="updId" type="number" placeholder="ID">
+    <input id="updName" placeholder="Nou nom">
+    <input id="updPrice" type="number" placeholder="Nou preu" step="0.01">
+    <button onclick="updateProduct()">Actualitzar</button>
+    <div id="updateResult"></div>
+</div>
+
+<!-- ESBORRAR -->
+<div class="section">
+    <h2>Esborrar producte</h2>
+    <input id="delId" type="number" placeholder="ID">
+    <button onclick="deleteProduct()">Esborrar</button>
+    <div id="deleteResult"></div>
+</div>
+
+<script>
+const API = "http://localhost:8080/api/products";
+
+function loadProducts() {
+    fetch(`${API}/products`)
+        .then(r => r.json())
+        .then(data => {
+            let html = "<table><tr><th>ID</th><th>Name</th><th>Price</th><th>Created</th></tr>";
+            data.data.forEach(p => {
+                html += `<tr>
+                            <td>${p.id}</td>
+                            <td>${p.name}</td>
+                            <td>${p.price}</td>
+                            <td>${p.created_at}</td>
+                         </tr>`;
+            });
+            html += "</table>";
+            document.getElementById("productList").innerHTML = html;
+        });
+}
+
+function getProduct() {
+    const id = document.getElementById("getId").value;
+    fetch(`${API}/products/${id}`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("getResult").innerHTML =
+                `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        });
+}
+
+function createProduct() {
+    const name = document.getElementById("newName").value;
+    const price = parseFloat(document.getElementById("newPrice").value);
+
+    fetch(`${API}/products`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, price })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById("createResult").innerHTML =
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    });
+}
+
+function updateProduct() {
+    const id = document.getElementById("updId").value;
+    const name = document.getElementById("updName").value;
+    const price = parseFloat(document.getElementById("updPrice").value);
+
+    fetch(`${API}/products/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, price })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById("updateResult").innerHTML =
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    });
+}
+
+function deleteProduct() {
+    const id = document.getElementById("delId").value;
+
+    fetch(`${API}/products/${id}`, {
+        method: "DELETE"
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById("deleteResult").innerHTML =
+            `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    });
+}
+</script>
+
+</body>
+</html>
