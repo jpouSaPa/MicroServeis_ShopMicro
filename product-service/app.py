@@ -5,14 +5,29 @@ import redis, json, os, datetime
 app = Flask(__name__)
 
 # ─────────────────────────────────────────────────────────────
-#  CONFIGURACIÓ BASE DE DADES (MySQL)
+#  CONFIGURACIÓ BASE DE DADES (MySQL) AMB DOCKER SECRETS
 # ─────────────────────────────────────────────────────────────
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL',
-    'mysql+pymysql://root:rootpass@db-products:3306/productsdb'
-)
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+import os
 
+# 1) Llegir la contrasenya del fitxer secret
+def load_db_password():
+    path = os.environ.get("DB_PASSWORD_FILE")
+    if path and os.path.exists(path):
+        with open(path, "r") as f:
+            return f.read().strip()
+    return None
+
+db_password = load_db_password()
+
+# 2) Variables configurables
+db_host = os.environ.get("DB_HOST", "db-products")
+db_name = os.environ.get("DB_NAME", "productsdb")
+
+# 3) Construir DATABASE_URL definitivament
+DATABASE_URL = f"mysql+pymysql://root:{db_password}@{db_host}:3306/{db_name}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ─────────────────────────────────────────────────────────────

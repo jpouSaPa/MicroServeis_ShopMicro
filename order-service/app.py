@@ -4,13 +4,21 @@ import pika, json, os, time, datetime
 
 app = Flask(__name__)
 
-# ─── Config MySQL ───────────────────────────────────────
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL',
-    'mysql+pymysql://root:rootpass@db-orders:3306/ordersdb'
-)
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# ─── Config MySQL amb secrets ─────────────────────────────────
+def load_db_password():
+    path = os.environ.get("DB_PASSWORD_FILE")
+    if path and os.path.exists(path):
+        with open(path, "r") as f:
+            return f.read().strip()
+    return None
 
+db_password = load_db_password()
+db_host = os.environ.get("DB_HOST", "db-orders")
+db_name = os.environ.get("DB_NAME", "ordersdb")
+
+DATABASE_URL = f"mysql+pymysql://root:{db_password}@{db_host}:3306/{db_name}"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 db = SQLAlchemy(app)
 
 

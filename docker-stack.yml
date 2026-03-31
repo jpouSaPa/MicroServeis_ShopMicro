@@ -21,8 +21,10 @@ services:
   db-products:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_products
       MYSQL_DATABASE: productsdb
+    secrets:
+      - db_root_password_products
     volumes:
       - db_products_data:/var/lib/mysql
     networks: [db-net]
@@ -41,8 +43,10 @@ services:
   db-orders:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_orders
       MYSQL_DATABASE: ordersdb
+    secrets:
+      - db_root_password_orders
     volumes:
       - db_orders_data:/var/lib/mysql
     networks: [db-net]
@@ -61,8 +65,10 @@ services:
   db-users:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_users
       MYSQL_DATABASE: usersdb
+    secrets:
+      - db_root_password_users
     volumes:
       - db_users_data:/var/lib/mysql
     networks: [db-net]
@@ -99,7 +105,9 @@ services:
     image: rabbitmq:3-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: adminpass
+      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
+    secrets:
+      - rabbitmq_password
     ports:
       - "15672:15672"
     networks: [backend-net]
@@ -123,7 +131,10 @@ services:
     environment:
       REDIS_HOST: cache
       DB_HOST: db-products
-      DATABASE_URL: mysql+pymysql://root:rootpass@db-products:3306/productsdb
+      DB_NAME: productsdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_products
+    secrets:
+      - db_root_password_products
     networks: [backend-net, db-net]
     deploy:
       replicas: 2
@@ -139,8 +150,11 @@ services:
     environment:
       RABBITMQ_HOST: message-queue
       DB_HOST: db-orders
-      DATABASE_URL: mysql+pymysql://root:rootpass@db-orders:3306/ordersdb
+      DB_NAME: ordersdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_orders
     networks: [backend-net, db-net]
+    secrets:
+      - db_root_password_orders
     deploy:
       replicas: 2
       restart_policy:
@@ -154,8 +168,12 @@ services:
     image: jpou/shopmicro-user-service:latest
     environment:
       DB_HOST: db-users
-      DATABASE_URL: mysql+pymysql://root:rootpass@db-users:3306/usersdb
-      SECRET_KEY: "x7FjQ9m2R4pS8uV3w0LbA1fT9ZkH5cN2yPqR6sM8nE0bV4tG7hJ1kL9dF6X3C2Z"
+      DB_NAME: usersdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_users
+      SECRET_KEY_FILE: /run/secrets/userservice_secret_key
+    secrets:
+      - db_root_password_users
+      - userservice_secret_key
     networks: [backend-net, db-net]
     deploy:
       replicas: 2
@@ -182,7 +200,14 @@ services:
     image: jpou/shopmicro-api-gateway:latest
     ports:
       - "8080:80"
-    networks: [frontend-net, backend-net]
+    networks:
+      frontend-net:
+      backend-net:
+        aliases:
+          - product-service
+          - user-service
+          - order-service
+          - notification-service
     deploy:
       replicas: 2
       restart_policy:
@@ -204,3 +229,16 @@ services:
       update_config:
         parallelism: 1
         delay: 10s
+
+secrets:
+  db_root_password_products:
+    external: true
+  db_root_password_users:
+    external: true
+  db_root_password_orders:
+    external: true
+  rabbitmq_password:
+    external: true
+  userservice_secret_key:
+    external: true
+
