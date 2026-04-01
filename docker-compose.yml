@@ -15,16 +15,28 @@ volumes:
   db_users_data:
   rabbitmq_data:
 
+secrets:
+  db_root_password_products:
+    file: ./secrets/db_root_password_products
+  db_root_password_orders:
+    file: ./secrets/db_root_password_orders
+  db_root_password_users:
+    file: ./secrets/db_root_password_users
+  rabbitmq_password:
+    file: ./secrets/rabbitmq_password
+  userservice_secret_key:
+    file: ./secrets/userservice_secret_key
+
 services:
 
   # ─── BASES DE DADES ─────────────────────────────────
   db-products:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_products
       MYSQL_DATABASE: productsdb
-      RABBITMQ_USER: admin
-      RABBITMQ_PASS: adminpass
+    secrets:
+      - db_root_password_products
     volumes:
       - db_products_data:/var/lib/mysql
     networks: [db-net]
@@ -37,8 +49,10 @@ services:
   db-orders:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_orders
       MYSQL_DATABASE: ordersdb
+    secrets:
+      - db_root_password_orders
     volumes:
       - db_orders_data:/var/lib/mysql
     networks: [db-net]
@@ -51,8 +65,10 @@ services:
   db-users:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password_users
       MYSQL_DATABASE: usersdb
+    secrets:
+      - db_root_password_users
     volumes:
       - db_users_data:/var/lib/mysql
     networks: [db-net]
@@ -95,6 +111,10 @@ services:
     environment:
       REDIS_HOST: cache
       DB_HOST: db-products
+      DB_NAME: productsdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_products
+    secrets:
+      - db_root_password_products 
     networks: [backend-net, db-net]
     depends_on:
       db-products: { condition: service_healthy }
@@ -104,8 +124,13 @@ services:
     build: ./order-service
     environment:
       RABBITMQ_HOST: message-queue
+      RABBITMQ_PASSWORD_FILE: /run/secrets/rabbitmq_password
       DB_HOST: db-orders
-      DATABASE_URL: mysql+pymysql://root:rootpass@db-orders:3306/ordersdb
+      DB_NAME: ordersdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_orders
+    secrets:
+      - db_root_password_orders
+      - rabbitmq_password
     networks: [backend-net, db-net]
     depends_on:
       db-orders: { condition: service_healthy }
@@ -115,8 +140,12 @@ services:
     build: ./user-service
     environment:
       DB_HOST: db-users
-      DATABASE_URL: mysql+pymysql://root:rootpass@db-users:3306/usersdb
-      SECRET_KEY: "x7FjQ9m2R4pS8uV3w0LbA1fT9ZkH5cN2yPqR6sM8nE0bV4tG7hJ1kL9dF6X3C2Z"
+      DB_NAME: usersdb
+      DB_PASSWORD_FILE: /run/secrets/db_root_password_users
+      SECRET_KEY_FILE: /run/secrets/userservice_secret_key
+    secrets:
+      - db_root_password_users
+      - userservice_secret_key
     networks: [backend-net, db-net]
     depends_on:
       db-users: { condition: service_healthy }
@@ -126,6 +155,9 @@ services:
     build: ./notification-service
     environment:
       RABBITMQ_HOST: message-queue
+      RABBITMQ_PASSWORD_FILE: /run/secrets/rabbitmq_password
+    secrets:
+      - rabbitmq_password
     networks: [backend-net]
     depends_on:
       message-queue: { condition: service_healthy }
