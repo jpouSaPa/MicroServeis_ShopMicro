@@ -36,6 +36,8 @@ DATABASE_URL = f"mysql+pymysql://root:{db_password}@{db_host}:3306/{db_name}"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+app.config["JWT_EXPIRATION_HOURS"] = int(os.environ.get('JWT_EXPIRATION_HOURS', 24))
 db = SQLAlchemy(app)
 
 # ───────────────────────────────────────────────
@@ -137,6 +139,9 @@ def health():
 
 @app.route('/register', methods=['POST'])
 def register():
+    import socket
+    print(f'[REGISTER] Atès per {socket.gethostname()}', flush=True)
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -157,7 +162,7 @@ def register():
     user = User(
         username=username,
         email=email,
-        password_hash=generate_password_hash(password)
+        password_hash=generate_password_hash(password, method='pbkdf2:sha256')
     )
     db.session.add(user)
     db.session.commit()
@@ -168,6 +173,9 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
+    import socket
+    print(f'[LOGIN] Atès per {socket.gethostname()}', flush=True)
+
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -212,7 +220,7 @@ def update_me(current_user):
     if 'password' in data:
         if len(data['password']) < 8:
             return jsonify({'error': 'Password must be at least 8 characters'}), 400
-        current_user.password_hash = generate_password_hash(data['password'])
+        current_user.password_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
 
     db.session.commit()
     return jsonify({'message': 'User updated', 'user': current_user.to_dict()}), 200

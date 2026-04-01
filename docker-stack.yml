@@ -105,9 +105,7 @@ services:
     image: rabbitmq:3-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS_FILE: /run/secrets/rabbitmq_password
-    secrets:
-      - rabbitmq_password
+      RABBITMQ_DEFAULT_PASS: adminpass
     ports:
       - "15672:15672"
     networks: [backend-net]
@@ -203,11 +201,6 @@ services:
     networks:
       frontend-net:
       backend-net:
-        aliases:
-          - product-service
-          - user-service
-          - order-service
-          - notification-service
     deploy:
       replicas: 2
       restart_policy:
