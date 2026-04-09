@@ -1,0 +1,48 @@
+# ~/shopmicro/k8s/db-users.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-users
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-users
+  template:
+    metadata:
+      labels:
+        app: db-users
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: usersdb
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-root-password-users
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: db-users-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-users
+  namespace: shopmicro
+spec:
+  selector:
+    app: db-users
+  ports:
+  - port: 3306
+    targetPort: 3306
+

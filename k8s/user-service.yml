@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: jpou/shopmicro-user-service:latest
+
+        env:
+        - name: DB_HOST
+          value: db-users
+        - name: DB_NAME
+          value: usersdb
+
+        - name: DB_PASSWORD_FILE
+          value: /run/secrets/db-password
+
+        - name: SECRET_KEY_FILE
+          value: /run/secrets/secret-key
+
+        volumeMounts:
+        - name: db-password
+          mountPath: /run/secrets/db-password
+          subPath: password
+          readOnly: true
+
+        - name: secret-key
+          mountPath: /run/secrets/secret-key
+          subPath: secretkey
+          readOnly: true
+
+      volumes:
+      - name: db-password
+        secret:
+          secretName: db-root-password-users
+
+      - name: secret-key
+        secret:
+          secretName: userservice-secret-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: shopmicro
+spec:
+  selector:
+    app: user-service
+  ports:
+  - port: 5002
+    targetPort: 5002

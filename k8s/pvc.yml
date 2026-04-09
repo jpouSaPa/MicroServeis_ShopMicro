@@ -1,0 +1,48 @@
+# ~/shopmicro/k8s/pvc.yml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-products-pvc
+  namespace: shopmicro
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-orders-pvc
+  namespace: shopmicro
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+      requests:
+        storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-users-pvc
+  namespace: shopmicro
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+      requests:
+        storage: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: shopmicro
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+      requests:
+        storage: 2Gi

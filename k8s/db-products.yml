@@ -1,0 +1,48 @@
+# ~/shopmicro/k8s/db-products.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-products
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-products
+  template:
+    metadata:
+      labels:
+        app: db-products
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: "productsdb"
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-root-password-products
+              key: password
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: db-products-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-products
+  namespace: shopmicro
+spec:
+  type: ClusterIP
+  selector:
+    app: db-products
+  ports:
+  - port: 3306
+    targetPort: 3306

@@ -1,0 +1,45 @@
+# ~/shopmicro/k8s/product-service.yml
+ 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+      - name: product-service
+        image: jpou/shopmicro-product-service:latest
+        env:
+        - name: REDIS_HOST
+          value: cache
+        - name: DB_HOST
+          value: db-products
+        - name: DB_NAME
+          value: productsdb
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-root-password-products
+              key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: shopmicro
+spec:
+  selector:
+    app: product-service
+  ports:
+  - name: http
+    port: 5000
+    targetPort: 5000

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: jpou/shopmicro-order-service:latest
+
+        env:
+        - name: DB_HOST
+          value: db-orders
+        - name: DB_NAME
+          value: ordersdb
+        - name: DB_PASSWORD_FILE
+          value: /run/secrets/db-password
+
+        - name: RABBITMQ_HOST
+          value: message-queue
+        - name: RABBITMQ_PASSWORD_FILE
+          value: /run/secrets/rabbitmq-password
+
+        volumeMounts:
+        - name: db-password
+          mountPath: /run/secrets/db-password
+          subPath: password
+          readOnly: true
+
+        - name: rabbitmq-password
+          mountPath: /run/secrets/rabbitmq-password
+          subPath: password
+          readOnly: true
+
+      volumes:
+      - name: db-password
+        secret:
+          secretName: db-root-password-orders
+      - name: rabbitmq-password
+        secret:
+          secretName: rabbitmq-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: shopmicro
+spec:
+  selector:
+    app: order-service
+  ports:
+  - port: 5001
+    targetPort: 5001

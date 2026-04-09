@@ -1,0 +1,51 @@
+# ~/shopmicro/k8s/rabbitmq.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-queue
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: message-queue
+  template:
+    metadata:
+      labels:
+        app: message-queue
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3-management-alpine
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: admin
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-password
+              key: password
+        volumeMounts:
+        - name: mq
+          mountPath: /var/lib/rabbitmq
+      volumes:
+      - name: mq
+        persistentVolumeClaim:
+          claimName: rabbitmq-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: message-queue
+  namespace: shopmicro
+spec:
+  selector:
+    app: message-queue
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672 

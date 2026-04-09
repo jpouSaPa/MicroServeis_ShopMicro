@@ -1,0 +1,47 @@
+# ~/shopmicro/k8s/db-orders.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-orders
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-orders
+  template:
+    metadata:
+      labels:
+        app: db-orders
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: ordersdb
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-root-password-orders
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: db-orders-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-orders
+  namespace: shopmicro
+spec:
+  selector:
+    app: db-orders
+  ports:
+  - port: 3306
+    targetPort: 3306

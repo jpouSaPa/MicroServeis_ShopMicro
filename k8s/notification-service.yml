@@ -1,0 +1,46 @@
+# ~/shopmicro/k8s/notification-service.yml 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: shopmicro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: jpou/shopmicro-notification-service:latest
+        env:
+
+        - name: RABBITMQ_HOST
+          value: message-queue
+
+        - name: RABBITMQ_USER
+          value: admin
+
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-password
+              key: password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: shopmicro
+spec:
+  selector:
+    app: notification-service
+  ports:
+  - name: http
+    port: 5003
+    targetPort: 5003
