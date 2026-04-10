@@ -1,30 +1,16 @@
 #!/bin/bash
+
 set -e
+
 echo "──────────────────────────────────────────"
-echo "  Aplicant fitxers .yml en ordre correcte"
+echo "  Aplicant TOTS els fitxers .yml del directori"
 echo "──────────────────────────────────────────"
 
-cd "$(dirname "$0")"
-
-FILES=(
-    secrets-db.yml
-    pvc.yml
-    rabbitmq.yml
-    redis.yml
-    db-users.yml
-    db-products.yml
-    db-orders.yml
-    user-service.yml
-    product-service.yml
-    order-service.yml
-    notification-service.yml
-    api-gateway.yml
-    frontend.yml
-)
-
-for f in "${FILES[@]}"; do
-    echo "[+] Aplicant: $f"
-    kubectl apply -f "$f"
+for f in *.yml; do
+    if [ -f "$f" ]; then
+        echo "[+] Aplicant: $f"
+        kubectl apply -f "$f"
+    fi
 done
 
 echo "──────────────────────────────────────────"

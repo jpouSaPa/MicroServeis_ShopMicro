@@ -6,7 +6,7 @@ metadata:
   name: product-service
   namespace: shopmicro
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: product-service
@@ -25,11 +25,19 @@ spec:
           value: db-products
         - name: DB_NAME
           value: productsdb
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: db-root-password-products
-              key: password
+        - name: DB_PASSWORD_FILE          # ← canviat
+          value: /run/secrets/db-password # ← canviat
+
+        volumeMounts:                     # ← afegit
+        - name: db-password
+          mountPath: /run/secrets/db-password
+          subPath: password
+          readOnly: true
+
+      volumes:                            # ← afegit
+      - name: db-password
+        secret:
+          secretName: db-root-password-products
 ---
 apiVersion: v1
 kind: Service

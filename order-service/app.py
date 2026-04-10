@@ -56,13 +56,20 @@ def init_db():
 
 
 # ─── RabbitMQ helper ────────────────────────────────────
+def load_rabbitmq_password():
+    path = os.environ.get("RABBITMQ_PASSWORD_FILE")
+    if path and os.path.exists(path):
+        with open(path, "r") as f:
+            return f.read().strip()
+    return os.getenv('RABBITMQ_PASS', 'adminpass')
+
 def publish_order(order_dict):
     try:
         conn = pika.BlockingConnection(pika.ConnectionParameters(
             host=os.getenv('RABBITMQ_HOST', 'message-queue'),
             credentials=pika.PlainCredentials(
                 os.getenv('RABBITMQ_USER', 'admin'),
-                os.getenv('RABBITMQ_PASS', 'adminpass')
+                load_rabbitmq_password()        # ← canviat
             )
         ))
         ch = conn.channel()
