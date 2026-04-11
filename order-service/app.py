@@ -19,6 +19,11 @@ db_name = os.environ.get("DB_NAME", "ordersdb")
 DATABASE_URL = f"mysql+pymysql://root:{db_password}@{db_host}:3306/{db_name}"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
 db = SQLAlchemy(app)
 
 

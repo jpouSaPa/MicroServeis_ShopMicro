@@ -36,7 +36,10 @@ DATABASE_URL = f"mysql+pymysql://root:{db_password}@{db_host}:3306/{db_name}"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
 app.config["JWT_EXPIRATION_HOURS"] = int(os.environ.get('JWT_EXPIRATION_HOURS', 24))
 db = SQLAlchemy(app)
 
